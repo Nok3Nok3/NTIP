@@ -6,12 +6,14 @@ import Dekoracije from './pages/Dekoracije.js';
 import PaketiHrane from './pages/paketiHrane.js';
 import Termini from './pages/termini.js';
 import Usluge from './pages/usluge.js';
+import Rezervacije from './pages/Rezervacije.js';
 const app = express();
 const hostname = 'localhost';
 const port = 3000;
-
+const router = express.Router();
+app.use('/', router);
 app.use(cors());
-
+app.use(express.json());
 // Omogućavanje parsiranja JSON tijela
 app.use(express.json());
 
@@ -76,7 +78,27 @@ app.put('/korisnici/:id', (req, res) => {
     }
   });
 });
+app.get('/rezervacije', (req, res) => {
+  const korisnikId = req.query.korisnikId;
 
+  if (korisnikId) {
+    Rezervacije.getByKorisnikId(korisnikId, (err, rows) => {
+      if (err) {
+        res.status(500).json({ error: 'Greška pri dohvaćanju rezervacija za korisnika.' });
+      } else {
+        res.json(rows);
+      }
+    });
+  } else {
+    Rezervacije.getAll((err, rows) => {
+      if (err) {
+        res.status(500).json({ error: 'Greška pri dohvaćanju rezervacija.' });
+      } else {
+        res.json(rows);
+      }
+    });
+  }
+});
 // 5. DELETE - Briši korisnika po ID-u
 app.delete('/korisnici/:id', (req, res) => {
   const id = req.params.id;
@@ -91,6 +113,33 @@ app.delete('/korisnici/:id', (req, res) => {
     }
   });
 });
+//LOGIN
+app.post('/login', (req, res) => {
+  const { email, sifra } = req.body;
+
+  if (!email || !sifra) {
+    return res.status(400).json({ poruka: 'Email i šifra su obavezni.' });
+  }
+
+  Korisnici.login(email, sifra, (err, korisnikData) => {
+    if (err) {
+      return res.status(500).json({ poruka: 'Greška na serveru.' });
+    }
+
+    if (!korisnikData) {
+      return res.status(401).json({ poruka: 'Pogrešan email ili šifra.' });
+    }
+
+    res.json({
+      user: korisnikData.user,
+      token: korisnikData.token
+    });
+  });
+});
+
+
+
+
 // 1. GET - Dohvati sve svadbene sale
 app.get('/svadbenesale', (req, res) => {
     SvadbeneSale.getAll((err, rows) => {
@@ -490,6 +539,84 @@ app.get('/usluge', (req, res) => {
       }
     });
   });
+  //Rezervacije
+  // 1. GET - Dohvati sve rezervacije
+app.get('/rezervacije', (req, res) => {
+  Rezervacije.getAll((err, rows) => {
+    if (err) {
+      res.status(500).json({ error: 'Greška pri dohvaćanju rezervacija.' });
+    } else {
+      res.json(rows);
+    }
+  });
+});
+
+// 2. GET - Dohvati rezervaciju po ID-u
+app.get('/rezervacije/:id', (req, res) => {
+  const id = req.params.id;
+  Rezervacije.getById(id, (err, row) => {
+    if (err) {
+      res.status(500).json({ error: 'Greška pri dohvaćanju rezervacije.' });
+    } else if (!row) {
+      res.status(404).json({ error: 'Rezervacija nije pronađena.' });
+    } else {
+      res.json(row);
+    }
+  });
+});
+
+// 3. POST - Dodaj novu rezervaciju
+app.post('/rezervacije', (req, res) => {
+  const { Termin_id, Dekoracije_id, Korisnici_id, PaketiHrane_id, SvadbeneSale_id, Usluge_id } = req.body;
+
+  if (!Termin_id || !Dekoracije_id || !Korisnici_id || !PaketiHrane_id || !SvadbeneSale_id || !Usluge_id) {
+    return res.status(400).json({ error: 'Svi podaci su obavezni.' });
+  }
+
+  Rezervacije.add(Termin_id, Dekoracije_id, Korisnici_id, PaketiHrane_id, SvadbeneSale_id, Usluge_id, (err, id) => {
+    if (err) {
+      res.status(500).json({ error: 'Greška pri dodavanju rezervacije.' });
+    } else {
+      res.status(201).json({ message: 'Rezervacija uspješno dodana.', id: id });
+    }
+  });
+});
+
+// 4. PUT - Ažuriraj rezervaciju po ID-u
+app.put('/rezervacije/:id', (req, res) => {
+  const id = req.params.id;
+  const { Termin_id, Dekoracije_id, Korisnici_id, PaketiHrane_id, SvadbeneSale_id, Usluge_id } = req.body;
+
+  if (!Termin_id || !Dekoracije_id || !Korisnici_id || !PaketiHrane_id || !SvadbeneSale_id || !Usluge_id) {
+    return res.status(400).json({ error: 'Svi podaci su obavezni.' });
+  }
+
+  Rezervacije.updateById(id, Termin_id, Dekoracije_id, Korisnici_id, PaketiHrane_id, SvadbeneSale_id, Usluge_id, (err, changes) => {
+    if (err) {
+      res.status(500).json({ error: 'Greška pri ažuriranju rezervacije.' });
+    } else if (changes === 0) {
+      res.status(404).json({ error: 'Rezervacija nije pronađena za ažuriranje.' });
+    } else {
+      res.json({ message: 'Rezervacija uspješno ažurirana.' });
+    }
+  });
+});
+
+// 5. DELETE - Briši rezervaciju po ID-u
+app.delete('/rezervacije/:id', (req, res) => {
+  const id = req.params.id;
+
+  Rezervacije.deleteById(id, (err, changes) => {
+    if (err) {
+      res.status(500).json({ error: 'Greška pri brisanju rezervacije.' });
+    } else if (changes === 0) {
+      res.status(404).json({ error: 'Rezervacija nije pronađena za brisanje.' });
+    } else {
+      res.json({ message: 'Rezervacija uspješno obrisana.' });
+    }
+  });
+});
+
 // Pokretanje servera
 app.listen(port, hostname, () => {
   console.log(`Server radi na http://${hostname}:${port}`);

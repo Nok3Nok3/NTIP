@@ -1,7 +1,6 @@
-// pages/Korisnici.js
 import sqlite3 from 'sqlite3';
+import jwt from 'jsonwebtoken';
 
-// Konfiguracija baze podataka
 const db = new sqlite3.Database('./db/sqlite.db', (err) => {
   if (err) {
     console.error("Baza nije uspješno otvorena: ", err);
@@ -12,17 +11,14 @@ const db = new sqlite3.Database('./db/sqlite.db', (err) => {
 
 class Korisnici {
 
-  // Dohvatanje svih korisnika
   static getAll(callback) {
     db.all('SELECT * FROM Korisnici', callback);
   }
 
-  // Dohvatanje korisnika po ID-u
   static getById(id, callback) {
     db.get('SELECT * FROM Korisnici WHERE ID = ?', [id], callback);
   }
 
-  // Dodavanje novog korisnika
   static add(email, sifra, username, uloga, callback) {
     const query = 'INSERT INTO Korisnici (email, sifra, username, uloga) VALUES (?, ?, ?, ?)';
     db.run(query, [email, sifra, username, uloga], function (err) {
@@ -30,7 +26,6 @@ class Korisnici {
     });
   }
 
-  // Ažuriranje podataka korisnika
   static updateById(id, email, sifra, username, uloga, callback) {
     const query = 'UPDATE Korisnici SET email = ?, sifra = ?, username = ?, uloga = ? WHERE ID = ?';
     db.run(query, [email, sifra, username, uloga, id], function (err) {
@@ -38,7 +33,6 @@ class Korisnici {
     });
   }
 
-  // Brisanje korisnika po ID-u
   static deleteById(id, callback) {
     const query = 'DELETE FROM Korisnici WHERE ID = ?';
     db.run(query, [id], function (err) {
@@ -46,7 +40,6 @@ class Korisnici {
     });
   }
 
-  // Funkcija za login bez bcrypt (testiranje lozinki u čistom tekstu)
   static login(email, sifra, callback) {
     const query = 'SELECT * FROM Korisnici WHERE email = ?';
     db.get(query, [email], (err, user) => {
@@ -54,20 +47,26 @@ class Korisnici {
         return callback(err, null);
       }
       if (!user) {
-        return callback(null, null); // Korisnik ne postoji
+        return callback(null, null);
       }
-  
-      // Provjera lozinke (bez hashiranja, samo za testiranje)
+
       if (user.sifra === sifra) {
-        // Vraćamo podatke o korisniku
-        callback(null, {
-          id: user.ID,           // Koristi 'ID' kako je definisano u bazi
+        const payload = {
+          id: user.ID,
           email: user.email,
           username: user.username,
           uloga: user.uloga
+        };
+
+        const secretKey = 'adadda'; 
+        const token = jwt.sign(payload, secretKey, { expiresIn: '1h' }); 
+
+        callback(null, {
+          user: payload,
+          token: token
         });
       } else {
-        callback(null, null); // Pogrešna lozinka
+        callback(null, null);
       }
     });
   }
